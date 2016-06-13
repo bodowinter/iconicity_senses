@@ -1,0 +1,787 @@
+## Bodo Winter#
+## September 17, 2015#
+## Analysis for Ch. 6.4, 'Testing the iconicity of sensory words'#
+#
+##------------------------------------------------------------------#
+## Pre-processing:#
+##------------------------------------------------------------------#
+#
+## Set options:#
+#
+options(stringsAsFactors = F)#
+#
+## Load in packages:#
+#
+library(dplyr)#
+library(xlsx)#
+library(lsr)			# for cohensD function#
+library(effsize)		# for cohens.d function#
+library(car)		# for vif function#
+#
+## Define path to parent directory:#
+#
+mainPath <- '/Volumes/Macintosh HD/Users/teeniematlock/Desktop/research/senses_sensory_modalities/iconicity/analysis/'#
+#
+## Load in plotting and model prediction functions:#
+#
+source(file.path(mainPath, 'functions/plotting_functions.R'))#
+source(file.path(mainPath, 'functions/model_prediction_functions.R'))#
+#
+## Load in modality norms:#
+#
+setwd(file.path(mainPath, 'data'))#
+l <- read.csv('lynott_connell_2009_adj_norms.csv')#
+n <- read.csv('lynott_connell_2013_noun_norms.csv')#
+v <- read.csv('winter_2015_verb_norms.csv')
+## Bodo Winter#
+## September 17, 2015#
+## Analysis for Ch. 6.4, 'Testing the iconicity of sensory words'#
+#
+##------------------------------------------------------------------#
+## Pre-processing:#
+##------------------------------------------------------------------#
+#
+## Set options:#
+#
+options(stringsAsFactors = F)#
+#
+## Load in packages:#
+#
+library(dplyr)#
+library(xlsx)#
+library(lsr)			# for cohensD function#
+library(effsize)		# for cohens.d function#
+library(car)		# for vif function#
+#
+## Define path to parent directory:#
+#
+mainPath <- '/Volumes/Macintosh HD/Users/teeniematlock/Desktop/research/senses_sensory_modalities/iconicity/analysis/'#
+#
+## Load in plotting and model prediction functions:#
+#
+source(file.path(mainPath, 'functions/plotting_functions.R'))#
+source(file.path(mainPath, 'functions/model_prediction_functions.R'))#
+#
+## Load in modality norms:#
+#
+setwd(file.path(mainPath, 'data'))#
+l <- read.csv('lynott_connell_2009_adj_norms.csv')#
+n <- read.csv('lynott_connell_2013_noun_norms.csv')#
+v <- read.csv('winter_2016_verb_norms.csv')#
+#
+## Order factors for plotting:#
+#
+modalities <- c('Visual', 'Haptic', 'Auditory', 'Gustatory', 'Olfactory')#
+l$DominantModality <- factor(l$DominantModality, levels = modalities)#
+n$DominantModality <- factor(n$DominantModality, levels = modalities)#
+v$DominantModality <- factor(v$DominantModality, levels = modalities)#
+#
+## Reduce verbs to random SUBTLset:#
+#
+v <- filter(v, RandomSet == 'yes')#
+#
+## Load in iconicity data and aggregate over that one duplicated value:#
+#
+icon <- read.csv('iconicity_ratings.csv')#
+icon <- aggregate(Iconicity ~ Word, icon, mean)#
+#
+## Load in sensory experience ratings and SUBTLTLEX POS data:#
+#
+SER <- read.csv('juhasz_yap_2013_SER.csv')#
+conc <- read.csv('brysbaert_2013_concreteness.csv')#
+monagh <- read.csv('monaghan2014_systematicity.csv')#
+SUBTL <- read.csv('SUBTLEX_US.csv')#
+AOA <- read.csv('kuperman_2014_AOA.csv')#
+cortese <- read.csv('cortese_2004.csv')#
+paivio <- read.csv('MRC_paivio_imageability.csv')#
+clark <- read.csv('clark_paivio_2004_imageability.csv')#
+#
+## Get rid of 0's in the Paivio norms (corresponds to NAs):#
+#
+paivio <- filter(paivio, Imag != 0)#
+paivio <- aggregate(Imag ~ Word, paivio, mean)#
+#
+## Make all Clark & Paivio (2004) words lowcaps:#
+#
+clark <- mutate(clark, Word = tolower(Word))#
+#
+## Merge sensory experience ratings, concreteness ratings, into there:#
+#
+icon$SER <- SER[match(icon$Word, SER$Word), ]$SER#
+icon$PaivioImag <- paivio[match(icon$Word, paivio$Word), ]$Imag#
+icon$CorteseImag <- cortese[match(icon$Word, cortese$Word), ]$Imageability#
+icon$TogliaImag <- cortese[match(icon$Word, cortese$Word), ]$TogliaImageability#
+icon$ClarkImag1 <- clark[match(icon$Word, clark$Word), ]$Imageability#
+icon$ClarkImag2 <- clark[match(icon$Word, clark$Word), ]$Imageability2#
+icon$Conc <- conc[match(icon$Word, conc$Word), ]$Conc.M#
+icon$Syst <- monagh[match(icon$Word, monagh$word), ]$relativeIconicity#
+#
+## Merge frequency into there:#
+#
+icon$Freq <- SUBTL[match(icon$Word, SUBTL$Word),]$FREQcount#
+#
+## Log transform frequency:#
+#
+icon <- mutate(icon,#
+	LogFreq = log10(Freq))#
+#
+## How many overlap? Create a table of this:#
+#
+these_columns <- c('SER', 'PaivioImag', 'CorteseImag',#
+	'TogliaImag', 'ClarkImag1', 'ClarkImag2', 'Conc', 'Syst')#
+M <- data.frame(these_columns,#
+	N = numeric(length(these_columns)),#
+	Percent = numeric(length(these_columns)))#
+for (i in 1:length(these_columns)) {#
+	this_column <- these_columns[i]#
+	M[i, ]$N <- sum(!is.na(icon[, this_column]))#
+	M[i, ]$Percent <- round(M[i, ]$N  / 3001, 2)#
+	}#
+	# focus on Paivio / Clark / Brysbaert since N > 1000#
+#
+## Rename part of speech column:#
+#
+SUBTL <- rename(SUBTL, POS = Dom_PoS_SUBTLEX)#
+#
+## With the part-of-speech tags of SUBTLTLEX, merge grammatical items:#
+#
+gram_items <- c('Article', 'Conjunction', 'Determiner', 'Number', 'Preposition', 'Pronoun',#
+	'Not', 'Ex', '#N/A', 'To')#
+SUBTL[SUBTL$POS %in% gram_items,]$POS <- 'Grammatical'#
+#
+## Merge interjections and unclassified to just 'interjection':#
+#
+iconic_items <- c('Unclassified', 'Interjection')#
+SUBTL[SUBTL$POS %in% iconic_items,]$POS <- 'Interjection'#
+#
+## Code the POS of the following words (which occur in the iconicity data frame) by hand:#
+#
+SUBTL[SUBTL$Word == 'brown',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'kitty',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'walker',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'grr',]$POS <- 'Interjection'#
+SUBTL[SUBTL$Word == 'ash',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'beery',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'bray',]$POS <- 'Verb'	# according to Macmillan#
+SUBTL[SUBTL$Word == 'char',]$POS <- 'Verb'	# according to Macmillan#
+SUBTL[SUBTL$Word == 'curly',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'frost',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'god',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'grace',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'herby',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'jag',]$POS <- 'Noun'	# according to Macmillan#
+SUBTL[SUBTL$Word == 'jammy',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'march',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'pat',]$POS <- 'Verb'	# according to Macmillan#
+SUBTL[SUBTL$Word == 'rusty',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'shaggy',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'soundless',]$POS <- 'Adjective'#
+#
+## Code the POS of the following words (which occur in the SER data frame) by hand:#
+#
+nouns <- c('abbot', 'alto', 'arbor', 'arc', 'aspen', 'barb', 'basil', 'beck',#
+	'belle', 'bill', 'birch', 'bond', 'boulder', 'bud', 'burl', 'cam', 'cape',#
+	'carol', 'celeste', 'cheddar', 'cliff', 'cob', 'colt', 'coop', 'crick',#
+	'daisy', 'dale', 'dean', 'dell', 'dill', 'ensign', 'eve', 'fife',#
+	'finch', 'flax', 'flint', 'ford', 'fort', 'gable', 'gale', 'garland',#
+	'gene', 'gill', 'glen', 'gob', 'gong', 'gore', 'grant', 'hank', 'hart',#
+	'hawk', 'heath', 'helm', 'hutch', 'iris', 'jack', 'jasper', 'jay',#
+	'jersey', 'knight', 'lily', 'ma', 'mace', 'mandrake', 'mark', 'marsh',#
+	'mason', 'metro', 'mike', 'moll', 'moss', 'nick', 'pa', 'paddy', 'peacock',#
+	'pearl', 'peg', 'pelt', 'pip', 'poppy', 'prism', 'quill', 'ray', 'reed',#
+	'regent', 'reuben', 'robin', 'ruby', 'saint', 'sheen', 'shogun',#
+	'shore', 'sparrow', 'steed', 'stein', 'stork', 'swan', 'thorn',#
+	'trill', 'tulip', 'van', 'velcro', 'venus', 'ware', 'watt',#
+	'welch', 'wick', 'wren', 'yam')#
+#
+SUBTL[SUBTL$Word %in% nouns, ]$POS <- 'Noun'#
+#
+## Add verb tags:#
+#
+verbs <- c('dodge', 'don', 'drew', 'fester', 'josh', 'leach',#
+	'leer', 'lynch', 'parry', 'peck', 'pierce', 'retch', 'revere',#
+	'rue', 'stoke', 'trek')#
+#
+SUBTL[SUBTL$Word %in% verbs, ]$POS <- 'Verb'#
+#
+## Add adjective tags:#
+adjectives <- c('butch', 'frank', 'haggard', 'hale', 'hardy', 'hazel',#
+	'ill', 'stark')#
+#
+SUBTL[SUBTL$Word %in% adjectives, ]$POS <- 'Adjective'#
+#
+## Exclude tags that are not in MacMillan (no POS information):#
+#
+not_in_macmillan <- c('bunt', 'bosh', 'druthers', 'fritz', 'leary', 'lilly',#
+	'milch', 'tong')#
+#
+SUBTL <- SUBTL[!(SUBTL$Word %in% not_in_macmillan), ]#
+#
+## Exclude since it is listed as a name in MacMillan:#
+#
+SUBTL <- SUBTL[SUBTL$Word != 'bob',]#
+#
+## Merge POS into the iconicity dataset:#
+#
+icon$POS <- SUBTL[match(icon$Word, SUBTL$Word),]$POS
+## Descriptive stats:#
+#
+mean(icon$Iconicity)#
+sd(icon$Iconicity)#
+#
+## One sample t-test:#
+#
+t.test(icon$Iconicity, mu = 0)#
+#
+## One sample effect size:#
+#
+cohensD(icon$Iconicity, mu = 0)
+head(icon)
+##------------------------------------------------------------------#
+## Look at parts of speech for the iconicity ratings:#
+##------------------------------------------------------------------#
+#
+## Look at means:#
+#
+arrange(icon_agr <- aggregate(Iconicity ~ POS, icon, mean), desc(Iconicity))#
+arrange(icon_agr_sd <- aggregate(Iconicity ~ POS, icon, sd), desc(Iconicity))#
+#
+## For ease of reporting:#
+#
+(mutate(icon_agr, Iconicity = round(Iconicity, 2)) %>% arrange(desc(Iconicity)) -> icon_agr)#
+#
+## Test for significant differences between lexical categories:#
+#
+summary(icon_POS <- lm(Iconicity ~ POS, icon))#
+anova(icon_POS)#
+##------------------------------------------------------------------#
+## Comparison to Monaghan et al. (2014) norms:#
+##------------------------------------------------------------------#
+#
+## Linear model:#
+#
+cor.test(icon$Syst, icon$Iconicity,#
+	method = 'pearson', use = 'complete.obs')#
+summary(lm(Syst ~ Iconicity, icon))
+## Loop through imageability and concreteness variables and correlate + plot:#
+#
+these_columns <- c('SER', 'PaivioImag', 'CorteseImag', 'Conc')#
+M <- data.frame(these_columns,#
+	r = numeric(length(these_columns)),#
+	df = numeric(length(these_columns)),#
+	t = numeric(length(these_columns)),#
+	p = numeric(length(these_columns)))#
+#
+quartz(width = 11, height = 7)#
+par(mfrow = c(2, 2), mai = rep(0.35, 4))#
+for (i in 1:length(these_columns)) {#
+	this_column <- these_columns[i]#
+	M[i, ]$r <- cor(icon$Iconicity, icon[, this_column], use = 'complete.obs')#
+	fit <- cor.test(icon$Iconicity, icon[, this_column], use = 'complete.obs')#
+	M[i, ]$df <- fit$parameter#
+	M[i, ]$t <- fit$statistic#
+	M[i, ]$p <- round(fit$p.value, 3)#
+	plot(icon[, this_column], icon$Iconicity, xlab = '', ylab = this_column)#
+	mtext(this_column, side = 3, font = 2, line = 0.5)#
+	}#
+#
+## Patterns look quadratic, so let's do quadratic fits:#
+#
+summary(lm(Iconicity ~ SER, icon))#
+summary(lm(Iconicity ~ SER + I(SER^2), icon))#
+#
+summary(lm(Iconicity ~ Conc, icon))#
+summary(lm(Iconicity ~ Conc + I(Conc^2), icon))#
+#
+summary(lm(Iconicity ~ PaivioImag, icon))#
+summary(lm(Iconicity ~ PaivioImag + I(PaivioImag^2), icon))#
+#
+summary(lm(Iconicity ~ CorteseImag, icon))#
+summary(lm(Iconicity ~ CorteseImag + I(CorteseImag^2), icon))#
+#
+## Same thing for systematicity:#
+#
+summary(lm(Syst ~ SER, icon))#
+summary(lm(Syst ~ SER + I(SER^2), icon))#
+#
+summary(lm(Syst ~ Conc, icon))#
+summary(lm(Syst ~ Conc + I(Conc^2), icon))#
+#
+summary(lm(Syst ~ PaivioImag, icon))#
+summary(lm(Syst ~ PaivioImag + I(PaivioImag^2), icon))#
+#
+summary(lm(Syst ~ CorteseImag, icon))#
+summary(lm(Syst ~ CorteseImag + I(CorteseImag^2), icon))#
+#
+## Make a plot of the sensory experience ratings:#
+#
+summary(xmdl1 <- lm(Iconicity ~ SER + Conc + CorteseImag + Syst + LogFreq + POS, icon))#
+summary(xmdl2 <- lm(Iconicity ~ SER + Conc + PaivioImag + Syst + LogFreq + POS, icon))#
+#
+## For comparability, let's z-score the predictors:#
+#
+icon <- mutate(icon,#
+	Syst_z = (Syst - mean(Syst, na.rm = T)) / sd(Syst, na.rm = T),#
+	SER_z = (SER - mean(SER, na.rm = T)) / sd(SER, na.rm = T),#
+	Conc_z = (Conc - mean(Conc, na.rm = T)) / sd(Conc, na.rm = T),#
+	PaivioImag_z = (PaivioImag - mean(PaivioImag, na.rm = T)) / sd(PaivioImag, na.rm = T),#
+	CorteseImag_z = (CorteseImag - mean(CorteseImag, na.rm = T)) / sd(CorteseImag, na.rm = T),#
+	LogFreq_z = (LogFreq - mean(LogFreq, na.rm = T)) / sd(LogFreq, na.rm = T))#
+#
+## Make models with z-scored variables:#
+#
+summary(xmdl1_z_noPOS <- lm(Iconicity ~ SER_z + Conc_z + CorteseImag_z +#
+	Syst_z + LogFreq_z, icon))#
+summary(xmdl2_z_noPOS <- lm(Iconicity ~ SER_z + Conc_z + PaivioImag_z +#
+	Syst_z + LogFreq_z, icon))#
+#
+## Make models with z-scored variables and POS:#
+#
+summary(xmdl1_z <- lm(Iconicity ~ SER_z + Conc_z + CorteseImag_z +#
+	Syst_z + LogFreq_z + POS, icon))#
+summary(xmdl2_z <- lm(Iconicity ~ SER_z + Conc_z + PaivioImag_z +#
+	Syst_z + LogFreq_z + POS, icon))#
+#
+## Test variance inflation factors:#
+#
+vif(xmdl1_z_noPOS)#
+vif(xmdl1_z_noPOS)#
+vif(xmdl1_z)#
+vif(xmdl1_z)
+xagr <- rbind(dplyr::select(l, Word, DominantModality, VisualStrengthMean:OlfactoryStrengthMean,#
+	ModalityExclusivity),#
+	dplyr::select(n, Word, DominantModality, VisualStrengthMean:OlfactoryStrengthMean,#
+	ModalityExclusivity),#
+	dplyr::select(v, Word, DominantModality, VisualStrengthMean:OlfactoryStrengthMean,#
+	ModalityExclusivity))
+head(xagr)
+arrange(aggregate(Iconicity ~ DominantModality, xagr, mean), desc(Iconicity))#
+aggregate(Iconicity ~ DominantModality, xagr, sd)#
+#
+## Add POS column:#
+#
+xagr$POS <- c(rep('adj', nrow(l)), rep('noun', nrow(n)), rep('verb', nrow(v)))#
+#
+## Add iconicity and systematicity to this:#
+#
+xagr$Iconicity  <- icon[match(xagr$Word, icon$Word),]$Iconicity#
+xagr$Syst  <- icon[match(xagr$Word, icon$Word),]$Syst#
+#
+## Add frequency into this:#
+#
+xagr$Freq <- log10(SUBTL[match(xagr$Word, SUBTL$Word),]$FREQcount + 1)
+## Bodo Winter#
+## September 17, 2015#
+## Analysis for Ch. 6.4, 'Testing the iconicity of sensory words'#
+#
+##------------------------------------------------------------------#
+## Pre-processing:#
+##------------------------------------------------------------------#
+#
+## Set options:#
+#
+options(stringsAsFactors = F)#
+#
+## Load in packages:#
+#
+library(dplyr)#
+library(xlsx)#
+library(lsr)			# for cohensD function#
+library(effsize)		# for cohens.d function#
+library(car)		# for vif function#
+#
+## Define path to parent directory:#
+#
+mainPath <- '/Volumes/Macintosh HD/Users/teeniematlock/Desktop/research/senses_sensory_modalities/iconicity/analysis/'#
+#
+## Load in plotting and model prediction functions:#
+#
+source(file.path(mainPath, 'functions/plotting_functions.R'))#
+source(file.path(mainPath, 'functions/model_prediction_functions.R'))#
+#
+## Load in modality norms:#
+#
+setwd(file.path(mainPath, 'data'))#
+l <- read.csv('lynott_connell_2009_adj_norms.csv')#
+n <- read.csv('lynott_connell_2013_noun_norms.csv')#
+v <- read.csv('winter_2016_verb_norms.csv')#
+#
+## Order factors for plotting:#
+#
+modalities <- c('Visual', 'Haptic', 'Auditory', 'Gustatory', 'Olfactory')#
+l$DominantModality <- factor(l$DominantModality, levels = modalities)#
+n$DominantModality <- factor(n$DominantModality, levels = modalities)#
+v$DominantModality <- factor(v$DominantModality, levels = modalities)#
+#
+## Reduce verbs to random SUBTLset:#
+#
+v <- filter(v, RandomSet == 'yes')#
+#
+## Load in iconicity data and aggregate over that one duplicated value:#
+#
+icon <- read.csv('iconicity_ratings.csv')#
+icon <- aggregate(Iconicity ~ Word, icon, mean)#
+#
+## Load in sensory experience ratings and SUBTLTLEX POS data:#
+#
+SER <- read.csv('juhasz_yap_2013_SER.csv')#
+conc <- read.csv('brysbaert_2013_concreteness.csv')#
+monagh <- read.csv('monaghan2014_systematicity.csv')#
+SUBTL <- read.csv('SUBTLEX_US.csv')#
+AOA <- read.csv('kuperman_2014_AOA.csv')#
+cortese <- read.csv('cortese_2004.csv')#
+paivio <- read.csv('MRC_paivio_imageability.csv')#
+clark <- read.csv('clark_paivio_2004_imageability.csv')#
+#
+## Get rid of 0's in the Paivio norms (corresponds to NAs):#
+#
+paivio <- filter(paivio, Imag != 0)#
+paivio <- aggregate(Imag ~ Word, paivio, mean)#
+#
+## Make all Clark & Paivio (2004) words lowcaps:#
+#
+clark <- mutate(clark, Word = tolower(Word))#
+#
+## Merge sensory experience ratings, concreteness ratings, into there:#
+#
+icon$SER <- SER[match(icon$Word, SER$Word), ]$SER#
+icon$PaivioImag <- paivio[match(icon$Word, paivio$Word), ]$Imag#
+icon$CorteseImag <- cortese[match(icon$Word, cortese$Word), ]$Imageability#
+icon$TogliaImag <- cortese[match(icon$Word, cortese$Word), ]$TogliaImageability#
+icon$ClarkImag1 <- clark[match(icon$Word, clark$Word), ]$Imageability#
+icon$ClarkImag2 <- clark[match(icon$Word, clark$Word), ]$Imageability2#
+icon$Conc <- conc[match(icon$Word, conc$Word), ]$Conc.M#
+icon$Syst <- monagh[match(icon$Word, monagh$word), ]$relativeIconicity#
+#
+## Merge frequency into there:#
+#
+icon$Freq <- SUBTL[match(icon$Word, SUBTL$Word),]$FREQcount#
+#
+## Log transform frequency:#
+#
+icon <- mutate(icon,#
+	LogFreq = log10(Freq))#
+#
+## How many overlap? Create a table of this:#
+#
+these_columns <- c('SER', 'PaivioImag', 'CorteseImag',#
+	'TogliaImag', 'ClarkImag1', 'ClarkImag2', 'Conc', 'Syst')#
+M <- data.frame(these_columns,#
+	N = numeric(length(these_columns)),#
+	Percent = numeric(length(these_columns)))#
+for (i in 1:length(these_columns)) {#
+	this_column <- these_columns[i]#
+	M[i, ]$N <- sum(!is.na(icon[, this_column]))#
+	M[i, ]$Percent <- round(M[i, ]$N  / 3001, 2)#
+	}#
+	# focus on Paivio / Clark / Brysbaert since N > 1000#
+#
+## Rename part of speech column:#
+#
+SUBTL <- rename(SUBTL, POS = Dom_PoS_SUBTLEX)#
+#
+## With the part-of-speech tags of SUBTLTLEX, merge grammatical items:#
+#
+gram_items <- c('Article', 'Conjunction', 'Determiner', 'Number', 'Preposition', 'Pronoun',#
+	'Not', 'Ex', '#N/A', 'To')#
+SUBTL[SUBTL$POS %in% gram_items,]$POS <- 'Grammatical'#
+#
+## Merge interjections and unclassified to just 'interjection':#
+#
+iconic_items <- c('Unclassified', 'Interjection')#
+SUBTL[SUBTL$POS %in% iconic_items,]$POS <- 'Interjection'#
+#
+## Code the POS of the following words (which occur in the iconicity data frame) by hand:#
+#
+SUBTL[SUBTL$Word == 'brown',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'kitty',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'walker',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'grr',]$POS <- 'Interjection'#
+SUBTL[SUBTL$Word == 'ash',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'beery',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'bray',]$POS <- 'Verb'	# according to Macmillan#
+SUBTL[SUBTL$Word == 'char',]$POS <- 'Verb'	# according to Macmillan#
+SUBTL[SUBTL$Word == 'curly',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'frost',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'god',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'grace',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'herby',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'jag',]$POS <- 'Noun'	# according to Macmillan#
+SUBTL[SUBTL$Word == 'jammy',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'march',]$POS <- 'Noun'#
+SUBTL[SUBTL$Word == 'pat',]$POS <- 'Verb'	# according to Macmillan#
+SUBTL[SUBTL$Word == 'rusty',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'shaggy',]$POS <- 'Adjective'#
+SUBTL[SUBTL$Word == 'soundless',]$POS <- 'Adjective'#
+#
+## Code the POS of the following words (which occur in the SER data frame) by hand:#
+#
+nouns <- c('abbot', 'alto', 'arbor', 'arc', 'aspen', 'barb', 'basil', 'beck',#
+	'belle', 'bill', 'birch', 'bond', 'boulder', 'bud', 'burl', 'cam', 'cape',#
+	'carol', 'celeste', 'cheddar', 'cliff', 'cob', 'colt', 'coop', 'crick',#
+	'daisy', 'dale', 'dean', 'dell', 'dill', 'ensign', 'eve', 'fife',#
+	'finch', 'flax', 'flint', 'ford', 'fort', 'gable', 'gale', 'garland',#
+	'gene', 'gill', 'glen', 'gob', 'gong', 'gore', 'grant', 'hank', 'hart',#
+	'hawk', 'heath', 'helm', 'hutch', 'iris', 'jack', 'jasper', 'jay',#
+	'jersey', 'knight', 'lily', 'ma', 'mace', 'mandrake', 'mark', 'marsh',#
+	'mason', 'metro', 'mike', 'moll', 'moss', 'nick', 'pa', 'paddy', 'peacock',#
+	'pearl', 'peg', 'pelt', 'pip', 'poppy', 'prism', 'quill', 'ray', 'reed',#
+	'regent', 'reuben', 'robin', 'ruby', 'saint', 'sheen', 'shogun',#
+	'shore', 'sparrow', 'steed', 'stein', 'stork', 'swan', 'thorn',#
+	'trill', 'tulip', 'van', 'velcro', 'venus', 'ware', 'watt',#
+	'welch', 'wick', 'wren', 'yam')#
+#
+SUBTL[SUBTL$Word %in% nouns, ]$POS <- 'Noun'#
+#
+## Add verb tags:#
+#
+verbs <- c('dodge', 'don', 'drew', 'fester', 'josh', 'leach',#
+	'leer', 'lynch', 'parry', 'peck', 'pierce', 'retch', 'revere',#
+	'rue', 'stoke', 'trek')#
+#
+SUBTL[SUBTL$Word %in% verbs, ]$POS <- 'Verb'#
+#
+## Add adjective tags:#
+adjectives <- c('butch', 'frank', 'haggard', 'hale', 'hardy', 'hazel',#
+	'ill', 'stark')#
+#
+SUBTL[SUBTL$Word %in% adjectives, ]$POS <- 'Adjective'#
+#
+## Exclude tags that are not in MacMillan (no POS information):#
+#
+not_in_macmillan <- c('bunt', 'bosh', 'druthers', 'fritz', 'leary', 'lilly',#
+	'milch', 'tong')#
+#
+SUBTL <- SUBTL[!(SUBTL$Word %in% not_in_macmillan), ]#
+#
+## Exclude since it is listed as a name in MacMillan:#
+#
+SUBTL <- SUBTL[SUBTL$Word != 'bob',]#
+#
+## Merge POS into the iconicity dataset:#
+#
+icon$POS <- SUBTL[match(icon$Word, SUBTL$Word),]$POS#
+##------------------------------------------------------------------#
+## One sample t-test against zero:#
+##------------------------------------------------------------------#
+#
+## Descriptive stats:#
+#
+mean(icon$Iconicity)#
+sd(icon$Iconicity)#
+#
+## One sample t-test:#
+#
+t.test(icon$Iconicity, mu = 0)#
+#
+## One sample effect size:#
+#
+cohensD(icon$Iconicity, mu = 0)#
+##------------------------------------------------------------------#
+## Look at parts of speech for the iconicity ratings:#
+##------------------------------------------------------------------#
+#
+## Look at means:#
+#
+arrange(icon_agr <- aggregate(Iconicity ~ POS, icon, mean), desc(Iconicity))#
+arrange(icon_agr_sd <- aggregate(Iconicity ~ POS, icon, sd), desc(Iconicity))#
+#
+## For ease of reporting:#
+#
+(mutate(icon_agr, Iconicity = round(Iconicity, 2)) %>% arrange(desc(Iconicity)) -> icon_agr)#
+#
+## Test for significant differences between lexical categories:#
+#
+summary(icon_POS <- lm(Iconicity ~ POS, icon))#
+anova(icon_POS)#
+##------------------------------------------------------------------#
+## Comparison to Monaghan et al. (2014) norms:#
+##------------------------------------------------------------------#
+#
+## Linear model:#
+#
+cor.test(icon$Syst, icon$Iconicity,#
+	method = 'pearson', use = 'complete.obs')#
+summary(lm(Syst ~ Iconicity, icon))#
+##------------------------------------------------------------------#
+## Analysis of SER ratings, simple:#
+##------------------------------------------------------------------#
+#
+## Loop through imageability and concreteness variables and correlate + plot:#
+#
+these_columns <- c('SER', 'PaivioImag', 'CorteseImag', 'Conc')#
+M <- data.frame(these_columns,#
+	r = numeric(length(these_columns)),#
+	df = numeric(length(these_columns)),#
+	t = numeric(length(these_columns)),#
+	p = numeric(length(these_columns)))#
+#
+quartz(width = 11, height = 7)#
+par(mfrow = c(2, 2), mai = rep(0.35, 4))#
+for (i in 1:length(these_columns)) {#
+	this_column <- these_columns[i]#
+	M[i, ]$r <- cor(icon$Iconicity, icon[, this_column], use = 'complete.obs')#
+	fit <- cor.test(icon$Iconicity, icon[, this_column], use = 'complete.obs')#
+	M[i, ]$df <- fit$parameter#
+	M[i, ]$t <- fit$statistic#
+	M[i, ]$p <- round(fit$p.value, 3)#
+	plot(icon[, this_column], icon$Iconicity, xlab = '', ylab = this_column)#
+	mtext(this_column, side = 3, font = 2, line = 0.5)#
+	}#
+#
+## Patterns look quadratic, so let's do quadratic fits:#
+#
+summary(lm(Iconicity ~ SER, icon))#
+summary(lm(Iconicity ~ SER + I(SER^2), icon))#
+#
+summary(lm(Iconicity ~ Conc, icon))#
+summary(lm(Iconicity ~ Conc + I(Conc^2), icon))#
+#
+summary(lm(Iconicity ~ PaivioImag, icon))#
+summary(lm(Iconicity ~ PaivioImag + I(PaivioImag^2), icon))#
+#
+summary(lm(Iconicity ~ CorteseImag, icon))#
+summary(lm(Iconicity ~ CorteseImag + I(CorteseImag^2), icon))#
+#
+## Same thing for systematicity:#
+#
+summary(lm(Syst ~ SER, icon))#
+summary(lm(Syst ~ SER + I(SER^2), icon))#
+#
+summary(lm(Syst ~ Conc, icon))#
+summary(lm(Syst ~ Conc + I(Conc^2), icon))#
+#
+summary(lm(Syst ~ PaivioImag, icon))#
+summary(lm(Syst ~ PaivioImag + I(PaivioImag^2), icon))#
+#
+summary(lm(Syst ~ CorteseImag, icon))#
+summary(lm(Syst ~ CorteseImag + I(CorteseImag^2), icon))#
+#
+## Make a plot of the sensory experience ratings:#
+#
+summary(xmdl1 <- lm(Iconicity ~ SER + Conc + CorteseImag + Syst + LogFreq + POS, icon))#
+summary(xmdl2 <- lm(Iconicity ~ SER + Conc + PaivioImag + Syst + LogFreq + POS, icon))#
+#
+## For comparability, let's z-score the predictors:#
+#
+icon <- mutate(icon,#
+	Syst_z = (Syst - mean(Syst, na.rm = T)) / sd(Syst, na.rm = T),#
+	SER_z = (SER - mean(SER, na.rm = T)) / sd(SER, na.rm = T),#
+	Conc_z = (Conc - mean(Conc, na.rm = T)) / sd(Conc, na.rm = T),#
+	PaivioImag_z = (PaivioImag - mean(PaivioImag, na.rm = T)) / sd(PaivioImag, na.rm = T),#
+	CorteseImag_z = (CorteseImag - mean(CorteseImag, na.rm = T)) / sd(CorteseImag, na.rm = T),#
+	LogFreq_z = (LogFreq - mean(LogFreq, na.rm = T)) / sd(LogFreq, na.rm = T))#
+#
+## Make models with z-scored variables:#
+#
+summary(xmdl1_z_noPOS <- lm(Iconicity ~ SER_z + Conc_z + CorteseImag_z +#
+	Syst_z + LogFreq_z, icon))#
+summary(xmdl2_z_noPOS <- lm(Iconicity ~ SER_z + Conc_z + PaivioImag_z +#
+	Syst_z + LogFreq_z, icon))#
+#
+## Make models with z-scored variables and POS:#
+#
+summary(xmdl1_z <- lm(Iconicity ~ SER_z + Conc_z + CorteseImag_z +#
+	Syst_z + LogFreq_z + POS, icon))#
+summary(xmdl2_z <- lm(Iconicity ~ SER_z + Conc_z + PaivioImag_z +#
+	Syst_z + LogFreq_z + POS, icon))#
+#
+## Test variance inflation factors:#
+#
+vif(xmdl1_z_noPOS)#
+vif(xmdl1_z_noPOS)#
+vif(xmdl1_z)#
+vif(xmdl1_z)#
+#
+## Create a model without Conc (due to collinearity and not significant):#
+#
+summary(xmdl1_z <- lm(Iconicity ~ SER_z + CorteseImag_z +#
+	Syst_z + LogFreq_z + POS, icon))#
+summary(xmdl1_z_noPOS <- lm(Iconicity ~ SER_z + CorteseImag_z +#
+	Syst_z + LogFreq_z, icon))#
+summary(xmdl1_z_noPOS_noSER <- lm(Iconicity ~ 1 + CorteseImag_z +#
+	Syst_z + LogFreq_z, icon))#
+#
+## Make a marginal model without POS for plotting:#
+#
+noNA <- !is.na(icon$CorteseImag) & !is.na(icon$Syst) & !is.na(icon$LogFreq) & !is.na(icon$SER)#
+icon_red <- icon[noNA, ]#
+summary(xmdl1_marg <- lm(Iconicity ~ CorteseImag + LogFreq, icon_red))#
+icon_red$Res <- residuals(xmdl1_marg)#
+#
+## Regress iconicity onto SER:#
+#
+summary(xmdl <- lm(Res ~ SER, icon_red))#
+#
+## Make predictions for plot:#
+#
+newdata <- data.frame(SER = seq(1, 7, 0.01))#
+newdata$fit <- predict(xmdl, newdata)#
+newdata$UB <- newdata$fit + 1.96 * predict(xmdl, newdata, se.fit = T)$se.fit#
+newdata$LB <- newdata$fit - 1.96 * predict(xmdl, newdata, se.fit = T)$se.fit#
+#
+## Make a plot of this:#
+#
+setup_plots(N = 1)#
+emptyplot(xlim = c(1, 5.5), ylim = c(-3.5, 5))#
+left_axis(text = 'Iconicity Ratings', at = seq(-4, 4, 2), type = 1)#
+mtext(side = 2, line = 2.3, text = '(Residuals)', cex = 1.5)#
+lower_axis(style = 'continuous', at = 1:7, lab = '', type = 1)#
+mtext(side = 1, text = 'Sensory Experience Ratings',#
+	line = 3.5, font = 2, cex = 2)#
+# text(icon_red$SER, icon_red$Res, labels = icon_red$Word, col = rgb(0, 0, 0, 0.4))#
+points(icon_red$SER, icon_red$Res, pch = 19,#
+	cex = 0.7, col = rgb(0, 0, 0, 0.45))#
+polygon(c(newdata$SER, rev(newdata$SER)),#
+	c(newdata$UB, rev(newdata$LB)), col = rgb(0, 0, 0, 0.4), border = F)#
+points(newdata$SER, newdata$fit, lwd = 2, type = 'l')#
+#
+## Same thing with systematicity:#
+#
+summary(xmdl1_Syst <- lm(Syst ~ SER_z + CorteseImag_z +#
+	LogFreq_z + POS, icon))#
+summary(xmdl1_Syst_noPOS <- lm(Syst ~ SER_z + CorteseImag_z +#
+	LogFreq_z, icon))#
+summary(xmdl1_Syst_noPOS_noSER <- lm(Syst ~ 1 + CorteseImag_z +#
+	LogFreq_z, icon))#
+##------------------------------------------------------------------#
+## Analysis of by-modality differences:#
+##------------------------------------------------------------------#
+#
+## Take aggregate:#
+#
+xagr <- rbind(dplyr::select(l, Word, DominantModality, VisualStrengthMean:OlfactoryStrengthMean,#
+	ModalityExclusivity),#
+	dplyr::select(n, Word, DominantModality, VisualStrengthMean:OlfactoryStrengthMean,#
+	ModalityExclusivity),#
+	dplyr::select(v, Word, DominantModality, VisualStrengthMean:OlfactoryStrengthMean,#
+	ModalityExclusivity))#
+#
+## Descriptive means:#
+#
+arrange(aggregate(Iconicity ~ DominantModality, xagr, mean), desc(Iconicity))#
+aggregate(Iconicity ~ DominantModality, xagr, sd)#
+#
+## Add POS column:#
+#
+xagr$POS <- c(rep('adj', nrow(l)), rep('noun', nrow(n)), rep('verb', nrow(v)))#
+#
+## Add iconicity and systematicity to this:#
+#
+xagr$Iconicity  <- icon[match(xagr$Word, icon$Word),]$Iconicity#
+xagr$Syst  <- icon[match(xagr$Word, icon$Word),]$Syst#
+#
+## Add frequency into this:#
+#
+xagr$Freq <- log10(SUBTL[match(xagr$Word, SUBTL$Word),]$FREQcount + 1)
+head(xagr)
+xagr$Iconicity  <- icon[match(xagr$Word, icon$Word),]$Iconicity#
+xagr$Syst  <- icon[match(xagr$Word, icon$Word),]$Syst#
+#
+## Descriptive means:#
+#
+arrange(aggregate(Iconicity ~ DominantModality, xagr, mean), desc(Iconicity))#
+aggregate(Iconicity ~ DominantModality, xagr, sd)
+head(xagr)
+plot(xagr$ModalityExclusivity, xagr$Iconicity)
+summary(lm(Iconicity ~ ModalityExclusivity, xagr))

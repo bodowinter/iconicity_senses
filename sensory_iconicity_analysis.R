@@ -438,11 +438,21 @@ mypreds <- my.predict.lm(xmdl)
 
 ## Make a plot of this:
 
-setup_plots(N = 1)
+quartz('', 8, 6)
+par(mai = c(1.45, 1.25, 0.75, 0.75))
 emptyplot(xlim = c(0.5, 5.5), ylim = c(0, 2))
 draw_preds(mypreds)
-lower_axis(style = 'modality', lab = '', N = xagr$DominantModality, type = 2)
+axis(side = 1, at = 1:5,
+	labels = c('', '', '', '', ''),
+	font = 2, las = 2, cex.axis = 1.25, lwd.ticks = 2)
+axis(side = 1, at = 1:5 - 0.1,
+	labels = c('Visual', 'Tactile', 'Auditory', 'Gustatory', 'Olfactory'),
+	font = 2, las = 2, cex.axis = 1.25, lwd.ticks = 2, tick = F)
+axis(side = 1, at = 1:5 + 0.1,
+	labels = paste('N', table(xagr$DominantModality), sep = ' = '),
+	font = 2, las = 2, cex.axis = 1.05, lwd.ticks = 2, tick = F)
 left_axis(text = 'Iconicity', at = seq(0, 2, 0.5), type = 1)
+lower_axis(style = 'modality', lab = '', N = xagr$DominantModality, type = 2)
 
 ## Separate by-modality analysis for different parts of speech:
 
@@ -460,7 +470,13 @@ summary(xmdl.pos.syst <- lm(Syst ~ DominantModality + POS + Freq, xagr))
 anova(xmdl.syst)
 anova(xmdl.pos.syst)
 
+## Among the adjectives, test whether color terms have significantly lower iconicity:
 
+semcodings <- read.csv('lynott_connell_2009_semantic_codings.csv')
+l$Color <- semcodings[match(l$Word, semcodings$Word), ]$Color
+l$Iconicity <- icon[match(l$Word, icon$Word), ]$Iconicity
+visonly <- filter(l, DominantModality == 'Visual')
+t.test(Iconicity ~ Color, visonly, paired = F, var.equal = T)
 
 
 

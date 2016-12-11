@@ -20,7 +20,7 @@ library(car)		# for vif function
 
 ## Define path to parent directory:
 
-mainPath <- '/Volumes/Macintosh HD/Users/teeniematlock/Desktop/research/senses_sensory_modalities/iconicity/analysis/'
+mainPath <- '/Users/winterb/Research/senses_sensory_modalities/iconicity/analysis/'
 
 ## Load in plotting and model prediction functions:
 
@@ -231,6 +231,50 @@ arrange(icon_agr_sd <- aggregate(Iconicity ~ POS, icon, sd), desc(Iconicity))
 summary(icon_POS <- lm(Iconicity ~ POS, icon))
 anova(icon_POS)
 
+## Slides for Cologne talk, POS differences:
+
+xmeans <- aggregate(Iconicity ~ POS, icon, mean)
+xmeans <- arrange(xmeans, desc(Iconicity))
+xmeans <- mutate(xmeans, Icon = round(Iconicity, 1))
+
+color.fnc <- colorRampPalette(c('goldenrod', 'steelblue'), space = 'rgb')
+colors <- color.fnc(7)
+
+xfac <- 0.1
+yfac <- 0.13
+i <- 5
+quartz('', 10, 6.5)
+par(mai = c(1.5, 0.8, 0.2, 0.8))
+plot(1, 1, type = 'n', xlim = c(0, 8), ylim = c(0, 3),
+	bty = 'n', xlab = '', ylab = '',
+	xaxt = 'n', yaxt = 'n')
+if(i >= 1){
+rect(xleft = 0.5 + xfac, xright = 1.5 - xfac, ybottom = 0,
+	ytop = xmeans[1, 2], col = colors[1], border = NA)}
+if(i > 1 ){
+rect(xleft = 1.5 + xfac, xright = 2.5 - xfac, ybottom = 0,
+	ytop = xmeans[2, 2], col = colors[2], border = NA)}
+if(i > 2){
+rect(xleft = 2.5 + xfac, xright = 3.5 - xfac, ybottom = 0,
+	ytop = xmeans[3, 2], col = colors[3], border = NA)}
+if(i > 3){
+rect(xleft = 3.5 + xfac, xright = 4.5 - xfac, ybottom = 0,
+	ytop = xmeans[4, 2], col = colors[4], border = NA)}
+if(i > 4){
+rect(xleft = 4.5 + xfac, xright = 5.5 - xfac, ybottom = 0,
+	ytop = xmeans[5, 2], col = colors[5], border = NA)}
+if(i > 5){
+rect(xleft = 5.5 + xfac, xright = 6.5 - xfac, ybottom = 0,
+	ytop = xmeans[6, 2], col = colors[6], border = NA)}
+if(i > 6){
+rect(xleft = 6.5 + xfac, xright = 7.5 - xfac, ybottom = 0,
+	ytop = xmeans[7, 2], col = colors[7], border = NA)}
+text(x = (1:7)[1:i], y = (xmeans$Iconicity + yfac)[1:i],
+	labels = xmeans$Icon[1:i], font = 2, cex = 2.3,
+	col = colors[1:i])
+axis(side = 1, at = (1:7)[1:i], labels = c('Inter', 'Verb', 'Adj', 'Adverb', 'Noun', 'Gram', 'Name')[1:i],
+	las = 2, font = 2, cex.axis = 2.3, tick = F, line = -1.1)
+
 
 
 ##------------------------------------------------------------------
@@ -339,6 +383,8 @@ vif(xmdl1_z)
 
 summary(xmdl1_z <- lm(Iconicity ~ SER_z + CorteseImag_z +
 	Syst_z + LogFreq_z + POS, icon))
+summary(xmdl2_paivio <- lm(Iconicity ~ SER_z + PaivioImag_z +
+	Syst_z + LogFreq_z + POS, icon))	
 summary(xmdl1_z_noPOS <- lm(Iconicity ~ SER_z + CorteseImag_z +
 	Syst_z + LogFreq_z, icon))
 summary(xmdl1_z_noPOS_noSER <- lm(Iconicity ~ 1 + CorteseImag_z +
@@ -357,7 +403,7 @@ summary(xmdl <- lm(Res ~ SER, icon_red))
 
 ## Make predictions for plot:
 
-newdata <- data.frame(SER = seq(1, 7, 0.01))
+newdata <- data.frame(SER = seq(0, 7, 0.01))
 newdata$fit <- predict(xmdl, newdata)
 newdata$UB <- newdata$fit + 1.96 * predict(xmdl, newdata, se.fit = T)$se.fit
 newdata$LB <- newdata$fit - 1.96 * predict(xmdl, newdata, se.fit = T)$se.fit
@@ -365,15 +411,15 @@ newdata$LB <- newdata$fit - 1.96 * predict(xmdl, newdata, se.fit = T)$se.fit
 ## Make a plot of this:
 
 setup_plots(N = 1)
-emptyplot(xlim = c(1, 5.5), ylim = c(-3.5, 5))
+emptyplot(xlim = c(1, 5.5), ylim = c(-3.5, 4.5))
 left_axis(text = 'Iconicity Ratings', at = seq(-4, 4, 2), type = 1)
 mtext(side = 2, line = 2.3, text = '(Residuals)', cex = 1.5)
 lower_axis(style = 'continuous', at = 1:7, lab = '', type = 1)
 mtext(side = 1, text = 'Sensory Experience Ratings',
 	line = 3.5, font = 2, cex = 2)
 # text(icon_red$SER, icon_red$Res, labels = icon_red$Word, col = rgb(0, 0, 0, 0.4))
-points(icon_red$SER, icon_red$Res, pch = 19,
-	cex = 0.7, col = rgb(0, 0, 0, 0.45))
+points(icon_red$SER, icon_red$Res, pch = 21,
+	cex = 1.1, bg = rgb(0, 0, 0, 0.6), col = NA)
 polygon(c(newdata$SER, rev(newdata$SER)),
 	c(newdata$UB, rev(newdata$LB)), col = rgb(0, 0, 0, 0.4), border = F)
 points(newdata$SER, newdata$fit, lwd = 2, type = 'l')
@@ -386,6 +432,84 @@ summary(xmdl1_Syst_noPOS <- lm(Syst ~ SER_z + CorteseImag_z +
 	LogFreq_z, icon))
 summary(xmdl1_Syst_noPOS_noSER <- lm(Syst ~ 1 + CorteseImag_z +
 	LogFreq_z, icon))
+
+## For Colonge plot, depict particular words:
+
+lA <- c('pop')
+lB <- c('pop', 'click')
+lC <- c('pop', 'click', 'steak')
+lD <- c('pop', 'click', 'steak', 'scale')
+lE <- c('pop', 'click', 'steak', 'scale', 'node')
+lF <- c('pop', 'click', 'steak', 'scale', 'node', 'quick')
+
+i <- which(icon_red$Word %in% lA)
+
+## Plot for Cologne presentation:
+
+quartz('', 9.5, 6.25)
+par(mai = c(1.25, 1.25, 0.25, 0.25))
+plot(1, 1, type = 'n', bty = 'n', xaxt = 'n', yaxt = 'n',
+	xlab = '', ylab = '', xlim = c(0.5, 5.5), ylim = c(-4, 4.5), xaxs = 'i', yaxs = 'i')
+points(icon_red$SER, icon_red$Res, font = 2,
+	bg = rgb(0, 0, 0, 0.7), cex = 1.5, pch = 21,
+	col = NA)
+# text(icon_red[i, ]$SER, icon_red[i, ]$Res, labels = icon_red[i, ]$Word,
+	# font = 2, col = 'black', cex = 2.5)
+# points(icon_red[-i, ]$SER, icon_red[-i, ]$Res, font = 2,
+	# bg = rgb(0, 0, 0, 0.7), cex = 1.5, pch = 21,
+	# col = NA)
+points(newdata$SER, newdata$fit, lwd = 4, type = 'l',
+	col = rgb(0.4, 0.1, 0.4, 0.9))
+polygon(c(newdata$SER, rev(newdata$SER)),
+	c(newdata$UB, rev(newdata$LB)), col = rgb(0.4, 0.1, 0.4, 0.6), border = F)
+arrows(x0 = 0.5, x1 = 5.5, y0 = -4, lwd = 6, xpd = NA)
+mtext(side = 1, text = 'Sensory Experience Ratings', cex = 3, font = 2, line = 3)
+arrows(x0 = 0.5, y0 = -4, y1 = 4.5, lwd = 6, xpd = NA)
+mtext(side = 2, text = 'Iconicity Ratings', cex = 3, font = 2, line = 2.5)
+
+## Plot for Cologne presentation of imageability:
+## Make a marginal model without POS for plotting:
+
+noNA <- !is.na(icon$CorteseImag) & !is.na(icon$Syst) & !is.na(icon$LogFreq) & !is.na(icon$SER)
+icon_red <- icon[noNA, ]
+summary(xmdl1_marg <- lm(Iconicity ~ LogFreq + SER, icon_red))
+icon_red$Res2 <- residuals(xmdl1_marg)
+
+## Regress iconicity onto SER:
+
+summary(xmdl <- lm(Res2 ~ CorteseImag, icon_red))
+
+## Make predictions for plot:
+
+newdata <- data.frame(CorteseImag = seq(0, 7, 0.01))
+newdata$fit <- predict(xmdl, newdata)
+newdata$UB <- newdata$fit + 1.96 * predict(xmdl, newdata, se.fit = T)$se.fit
+newdata$LB <- newdata$fit - 1.96 * predict(xmdl, newdata, se.fit = T)$se.fit
+
+## The plot:
+
+quartz('', 9.5, 6.25)
+par(mai = c(1.25, 1.25, 0.25, 0.25))
+plot(1, 1, type = 'n', bty = 'n', xaxt = 'n', yaxt = 'n',
+	xlab = '', ylab = '', xlim = c(0.5, 7.5), ylim = c(-3, 4.5), xaxs = 'i', yaxs = 'i')
+points(icon_red$CorteseImag, icon_red$Res2, font = 2,
+	bg = rgb(0, 0, 0, 0.7), cex = 1.5, pch = 21,
+	col = NA)
+# text(icon_red[i, ]$SER, icon_red[i, ]$Res, labels = icon_red[i, ]$Word,
+	# font = 2, col = 'black', cex = 2.5)
+# points(icon_red[-i, ]$SER, icon_red[-i, ]$Res, font = 2,
+	# bg = rgb(0, 0, 0, 0.7), cex = 1.5, pch = 21,
+	# col = NA)
+points(newdata$CorteseImag, newdata$fit, lwd = 4, type = 'l',
+	col = rgb(0.4, 0.1, 0.4, 0.9))
+polygon(c(newdata$CorteseImag, rev(newdata$CorteseImag)),
+	c(newdata$UB, rev(newdata$LB)), col = rgb(0.4, 0.1, 0.4, 0.6), border = F)
+arrows(x0 = 0.5, x1 = 7.5, y0 = -3, lwd = 6, xpd = NA)
+mtext(side = 1, text = 'Imageability Ratings', cex = 3, font = 2, line = 3)
+arrows(x0 = 0.5, y0 = -3, y1 = 4.5, lwd = 6, xpd = NA)
+mtext(side = 2, text = 'Iconicity Ratings', cex = 3, font = 2, line = 2.5)
+
+
 
 
 
@@ -477,6 +601,15 @@ l$Color <- semcodings[match(l$Word, semcodings$Word), ]$Color
 l$Iconicity <- icon[match(l$Word, icon$Word), ]$Iconicity
 visonly <- filter(l, DominantModality == 'Visual')
 t.test(Iconicity ~ Color, visonly, paired = F, var.equal = T)
+
+## Test continuous variables rather than categorical variables:
+
+summary(lm(Iconicity ~ HapticStrengthMean, data = xagr))
+summary(lm(Iconicity ~ AuditoryStrengthMean, data = xagr))
+summary(lm(Iconicity ~ OlfactoryStrengthMean, data = xagr))
+summary(lm(Iconicity ~ GustatoryStrengthMean, data = xagr))
+summary(lm(Iconicity ~ VisualStrengthMean, data = xagr))
+
 
 
 
